@@ -163,6 +163,11 @@ await withHome(homeA, async () => {
 // ---- 5. nothing readable → pinned, and loud about it ----------------------
 
 await withHome(makeHome(), async () => {
+  // The installed app's version is read from LOCALAPPDATA/ProgramFiles, which
+  // a fake HOME cannot redirect — so on a machine that HAS the app installed,
+  // this case would find it and never reach the pinned rung. The discovery is
+  // pointed at nothing here, which is what the case is about.
+  await withEnv({ GLMP_APP_PACKAGE: path.join(makeHome(), "no-app", "package.json") }, async () => {
   const config = loadConfig({ format: "openai" });
   const { log, warns } = captureLog();
   const layer = createIdentityLayer(config, log);
@@ -191,6 +196,7 @@ await withHome(makeHome(), async () => {
     delete process.env.GLMP_IDENTITY_VERSION;
     void homeB;
   }
+  });
 });
 
 // ---- 7. hot-reload on file rewrite, without a restart ---------------------
@@ -454,7 +460,11 @@ check("shape: a file without the anchor yields no banner instead of a guess",
     const long = `HEAD-MARKER\n${"x".repeat(4096)}\nTAIL-MARKER`;
     const messages = [{ role: "system", content: long }, { role: "user", content: "hi" }];
 
-    await withEnv({ ...NO_INSTALL(home), PROMPT_ENVELOPE_KB: "1" }, async () => {
+    // The fold-into-the-system-message shape is upstream's, and this suite is
+    // upstream's shape suite: it is pinned here explicitly so the assertions
+    // below keep testing the folded banner. The fork's default (the banner in
+    // a system message of its own) is covered by tests/st-profile.mjs.
+    await withEnv({ ...NO_INSTALL(home), PROMPT_ENVELOPE_KB: "1", GLMP_BANNER_MODE: "merge" }, async () => {
       const config = loadConfig({ format: "openai" });
       const cap = captureLog();
       const layer = getShapeLayer(config, cap.log);
@@ -475,7 +485,7 @@ check("shape: a file without the anchor yields no banner instead of a guess",
         cap.warns.some((w) => /compacted to the 1KB envelope/.test(w)), cap.warns.join(" | "));
     });
 
-    await withEnv(NO_INSTALL(home), async () => {
+    await withEnv({ ...NO_INSTALL(home), GLMP_BANNER_MODE: "merge" }, async () => {
       const config = loadConfig({ format: "openai" });
       const layer = getShapeLayer(config, captureLog().log);
       const out = layer.apply(messages, []);
@@ -565,7 +575,7 @@ check("shape: a file without the anchor yields no banner instead of a guess",
       "You are an interactive CLI tool that helps users with software engineering tasks. " +
       "Use the instructions below.";
 
-    await withEnv({ ...NO_INSTALL(home), GLMP_AUTOCLAW2: "1" }, async () => {
+    await withEnv({ ...NO_INSTALL(home), GLMP_AUTOCLAW2: "1", GLMP_BANNER_MODE: "merge" }, async () => {
       const config = loadConfig({ format: "openai" });
       const cap = captureLog();
       const layer = getShapeLayer(config, cap.log);
@@ -628,7 +638,7 @@ check("shape: a file without the anchor yields no banner instead of a guess",
     });
 
     // The guard is a switch, and `0` means off (the repo's convention).
-    await withEnv({ ...NO_INSTALL(home), GLMP_AUTOCLAW2: "1", GLMP_FOREIGN_IDENTITY_GUARD: "0" }, async () => {
+    await withEnv({ ...NO_INSTALL(home), GLMP_AUTOCLAW2: "1", GLMP_FOREIGN_IDENTITY_GUARD: "0", GLMP_BANNER_MODE: "merge" }, async () => {
       const config = loadConfig({ format: "openai" });
       const out = getShapeLayer(config, captureLog().log)
         .apply([{ role: "system", content: claudeCode }, { role: "user", content: "hi" }], []);
@@ -750,7 +760,7 @@ check("shape: a file without the anchor yields no banner instead of a guess",
 {
   const home = makeHome();
   await withHome(home, async () => {
-    await withEnv({ ...NO_INSTALL(home), GLMP_AUTOCLAW2: "1" }, async () => {
+    await withEnv({ ...NO_INSTALL(home), GLMP_AUTOCLAW2: "1", GLMP_BANNER_MODE: "merge" }, async () => {
       const config = loadConfig({ format: "openai" });
       check("shape: GLMP_SYSTEM_QUARANTINE defaults on",
         config.SYSTEM_QUARANTINE === true, String(config.SYSTEM_QUARANTINE));

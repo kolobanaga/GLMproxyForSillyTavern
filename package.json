@@ -1,9 +1,10 @@
-﻿{
+{
   "name": "glmproxy",
-  "version": "3.3.0",
-  "description": "Local OpenAI-compatible and Anthropic Messages API proxy for AutoClaw's Zhipu AI GLM and DeepSeek models",
+  "version": "3.4.0",
+  "description": "Local OpenAI-compatible and Anthropic Messages API proxy for AutoClaw's Zhipu AI GLM and DeepSeek models - SillyTavern profile",
   "main": "openai.js",
   "type": "module",
+  "private": true,
   "bin": {
     "glmproxy": "bin/cli.js",
     "glm-proxy": "bin/cli.js"
@@ -21,7 +22,8 @@
   "scripts": {
     "start": "node bin/cli.js",
     "anthropic": "node anthropic.js",
-    "test": "node tests/pen-test-p1.mjs && node tests/pen-test-p2.mjs && node tests/taxonomy.mjs && node tests/pen-test-p3.mjs && node tests/pen-test-p4.mjs && node tests/pen-test-p5.mjs && node tests/pen-test-p6.mjs && node tests/pen-test-p7.mjs && node tests/pen-test-p8.mjs && node tests/pen-test-p9.mjs && node tests/pen-test-p10.mjs && node tests/pen-test-p11.mjs && node tests/pen-test-p12.mjs && node tests/pen-test-p13.mjs && node tests/vault.mjs && node tests/secretservice.mjs && node tests/queue.mjs && node tests/catalog-refresh.mjs"
+    "test": "node tests/pen-test-p1.mjs && node tests/pen-test-p2.mjs && node tests/taxonomy.mjs && node tests/pen-test-p3.mjs && node tests/pen-test-p4.mjs && node tests/pen-test-p5.mjs && node tests/pen-test-p6.mjs && node tests/pen-test-p7.mjs && node tests/pen-test-p8.mjs && node tests/pen-test-p9.mjs && node tests/pen-test-p10.mjs && node tests/pen-test-p11.mjs && node tests/pen-test-p12.mjs && node tests/pen-test-p13.mjs && node tests/vault.mjs && node tests/secretservice.mjs && node tests/queue.mjs && node tests/st-profile.mjs && node tests/catalog-refresh.mjs",
+    "test:offline": "node tests/taxonomy.mjs && node tests/pen-test-p6.mjs && node tests/pen-test-p7.mjs && node tests/pen-test-p8.mjs && node tests/pen-test-p9.mjs && node tests/pen-test-p10.mjs && node tests/pen-test-p11.mjs && node tests/pen-test-p12.mjs && node tests/pen-test-p13.mjs && node tests/vault.mjs && node tests/secretservice.mjs && node tests/queue.mjs && node tests/st-profile.mjs"
   },
   "keywords": [
     "glm",
@@ -56,13 +58,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eequaled/GLMproxy.git"
+    "url": "git+https://github.com/kolobanaga/GLMproxyForSillyTavern.git"
   },
-  "homepage": "https://github.com/eequaled/GLMproxy",
+  "homepage": "https://github.com/kolobanaga/GLMproxyForSillyTavern",
   "bugs": {
-    "url": "https://github.com/eequaled/GLMproxy/issues"
-  },
-  "publishConfig": {
-    "access": "public"
+    "url": "https://github.com/kolobanaga/GLMproxyForSillyTavern/issues"
   }
 }

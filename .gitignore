@@ -7,3 +7,7 @@ proxy_requests_test.json
 proxy_requests*.jsonl
 proxy_requests*.lock
 .venv/
+proxy_dryrun.json
+proxy_dryrun.jsonl
+proxy_dryrun*.tmp
+stuff/

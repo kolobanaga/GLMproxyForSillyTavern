@@ -3,38 +3,34 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch: # manual re-run without pushing a new tag
+  workflow_dispatch: # release the current version without pushing a tag
 
+# Nothing to configure here: `gh release create` runs with the repository's
+# automatic GITHUB_TOKEN, so there are no secrets, no environment variables and
+# no npm credentials to set.
+#
+# This fork is distributed through GitHub Releases, not through npm - the
+# upstream project published the `glmproxy` package on npm and that name is
+# taken, so there is no npm publication here on purpose.
+#
+# What this workflow does, now that npm is gone:
+#   1. a tag is only released if the tree is green (the offline suites);
+#   2. the release page carries auto-generated notes and a versioned
+#      download for people who do not use git.
+# ci.yml covers the branches and the pull requests; this is the tag-time half.
 permissions:
   contents: write # create the GitHub Release
-  id-token: write # trusted publishing (OIDC): npm authenticates the workflow, no token needed
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the GitHub Release
-      id-token: write # trusted publishing (OIDC): npm authenticates the workflow, no token needed
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          # no registry-url on purpose: OIDC trusted publishing needs no .npmrc
-          # and a leftover auth token env makes npm skip the OIDC handshake
-
-      # npm < 11.5.1 silently fails the OIDC token exchange and reports a
-      # misleading 404 (npm/cli#9088). The runner's bundled npm can be older —
-      # force a current one before publishing.
-      - name: Upgrade npm for OIDC trusted publishing
-        run: npm i -g npm@latest
-
-      - name: OIDC environment check
-        run: |
-          npm --version
-          echo "oidc_url=$([ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] && echo present || echo MISSING)"
-          echo "oidc_token=$([ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ] && echo present || echo MISSING)"
-          echo "gha=${GITHUB_ACTIONS:-unset}"
 
       - name: Syntax checks
         run: |
@@ -43,46 +39,40 @@ jobs:
           done
 
       # The offline suites: no network, no credits, injected clock, TLS mock.
-      # Identical to the required CI gate — a tag must not publish a red tree.
+      # Identical to the required CI gate - a tag must not release a red tree.
       - name: Offline suites (no upstream)
-        run: |
-          node tests/taxonomy.mjs
-          node tests/pen-test-p6.mjs
-          node tests/pen-test-p7.mjs
-          node tests/pen-test-p8.mjs
-          node tests/pen-test-p9.mjs
-          node tests/pen-test-p10.mjs
-          node tests/pen-test-p11.mjs
-          node tests/pen-test-p12.mjs
-          node tests/pen-test-p13.mjs
-          node tests/vault.mjs
-          node tests/secretservice.mjs
-          node tests/queue.mjs
+        run: npm run test:offline
 
       - name: Tag must match package.json version
-        if: ${{ github.event_name == 'push' }} # only tag pushes; manual runs publish whatever version is in package.json
+        if: ${{ github.event_name == 'push' }} # only tag pushes; a manual run releases whatever version is in package.json
         run: |
-          PKG_VERSION=$(npm pkg get version | tr -d '"')
+          PKG_VERSION=$(node -p "require('./package.json').version")
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
             echo "::error::package.json is $PKG_VERSION but tag is $GITHUB_REF_NAME"
             exit 1
           fi
 
-      - name: Inspect tarball
-        run: npm pack --dry-run
-
-      # Trusted publishing: npm exchanges the workflow's OIDC token for a
-      # short-lived publish credential — no NPM_TOKEN secret, no OTP, and
-      # provenance is generated automatically. Configured on npmjs.com under
-      # Package settings → Trusted Publisher (repo: eequaled/GLMproxy,
-      # workflow: release.yml, action: npm publish).
-      # --loglevel verbose surfaces the OIDC exchange rejection reason (the
-      # oidc module logs it at verbose; ENEEDAUTH alone is misleading).
-      - name: Publish to npm
-        run: npm publish --loglevel verbose
+      # A manual run has no tag yet: take the version from package.json and
+      # let gh create the tag on the branch that was run.
+      - name: Resolve the release tag
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --generate-notes
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists - nothing to do."
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            gh release create "$TAG" --target "$GITHUB_REF_NAME" --generate-notes --title "$TAG"
+          else
+            gh release create "$TAG" --generate-notes --title "$TAG"
+          fi

@@ -39,7 +39,9 @@ jobs:
       - run: node tests/taxonomy.mjs
 
   # Offline suites: no network, no credits — injected clock, TLS mock fixture,
-  # fake HOME. These are the release gate. The matrix deliberately crosses all
+  # fake HOME. These are the required gate for every branch and pull request;
+  # the tag-time half of the gate lives in release.yml. The matrix deliberately
+  # crosses all
   # three platforms because the vault roots, the OSCrypt KDF and the Claude Code
   # launcher all branch on the host OS; the macOS leg (Application Support roots,
   # PBKDF2 at 1003 iterations, a real `security` Keychain round-trip) is verified
@@ -65,18 +67,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
-      - run: node tests/taxonomy.mjs
-      - run: node tests/pen-test-p6.mjs
-      - run: node tests/pen-test-p7.mjs
-      - run: node tests/pen-test-p8.mjs
-      - run: node tests/pen-test-p9.mjs
-      - run: node tests/pen-test-p10.mjs
-      - run: node tests/pen-test-p11.mjs
-      - run: node tests/pen-test-p12.mjs
-      - run: node tests/pen-test-p13.mjs
-      - run: node tests/vault.mjs
-      - run: node tests/secretservice.mjs
-      - run: node tests/queue.mjs
+      - run: npm run test:offline
 
   # Live-upstream suites: gated by cloud availability, so they run
   # continue-on-error and must never redden code PRs. Each uploads whatever

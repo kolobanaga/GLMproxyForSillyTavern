@@ -31,6 +31,7 @@ import {
   SSE_HEADERS, validateModelField, lastMessagePreview,
   logUpstreamErrorBody, callUpstreamWithInvalidRequestRetry,
   callUpstreamOpenAI, quarantineForRequest,
+  inspectUpstreamRequest, writeDryRunRecord,
   classifyUpstreamError, classifyTransportError,
   createPermanentFailureCache, getClientHeaders, startIdentityWatch, installShutdownHooks, VERSION,
   getPacingGovernor, classifyGovernorError,
@@ -188,6 +189,36 @@ function handleModels(req, res) {
   });
 }
 
+// The dry run's answer to the client: a well-formed, obviously synthetic
+// completion, so the client (a roleplay UI, a script) keeps working while the
+// operator inspects the dump. Nothing about this response comes from a model.
+function sendDryRunResponse(res, modelId, stream) {
+  const content = "[dry-run] request captured — nothing was sent upstream.";
+  const created = Math.floor(Date.now() / 1000);
+  const id = `dryrun-${generateId()}`;
+
+  if (!stream) {
+    return sendJSON(res, {
+      id,
+      object: "chat.completion",
+      created,
+      model: modelId,
+      choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    });
+  }
+
+  res.writeHead(200, SSE_HEADERS);
+  const chunk = (delta, finish) => `data: ${JSON.stringify({
+    id, object: "chat.completion.chunk", created, model: modelId,
+    choices: [{ index: 0, delta, finish_reason: finish ?? null }],
+  })}\n\n`;
+  res.write(chunk({ role: "assistant", content }));
+  res.write(chunk({}, "stop"));
+  res.write("data: [DONE]\n\n");
+  res.end();
+}
+
 async function handleChatCompletions(req, res) {
   const startTime = Date.now();
   const clientIp  = resolveClientIp(req);
@@ -246,6 +277,34 @@ async function handleChatCompletions(req, res) {
   log.info(`chat model=${modelId} stream=${stream}`);
 
   const lastMsgForLog = () => lastMessagePreview(body.messages);
+
+  // Dry run: build the upstream request exactly as it would go out, dump it,
+  // answer the client locally. No network, no credit, no budget slot - the
+  // client keeps talking and the operator sees what would have been sent.
+  // Deliberately before the governor: a request that never leaves the machine
+  // must not spend a slot or hold the pacing gap.
+  if (config.DRY_RUN) {
+    // The identity layer is asked for the headers the same way the live call
+    // asks for them, so the dump shows the version that would really go on the
+    // wire - not the snapshot the process started with.
+    const inspection = inspectUpstreamRequest(config, body, modelId, { log, knownIds, clientHeaders: getClientHeaders(config) });
+    const file = writeDryRunRecord(config, {
+      model: modelId,
+      stream,
+      clientBody: body,
+      upstreamBody: inspection.body,
+      upstreamHeaders: inspection.headers,
+      limit: inspection.limitNote,
+      bannerMode: inspection.bannerMode,
+      forwardedParams: inspection.forwardParams,
+    }, log);
+    log.info(`dry-run: model=${modelId} stream=${stream} captured -> ${file}`);
+    if (config.DRY_RUN_VERBOSE) {
+      log.info(`dry-run: upstream body ->\n${JSON.stringify(inspection.body, null, 2)}`);
+    }
+    record(200, { model: modelId, lastMessage: lastMsgForLog(), messageCount: body.messages?.length || 0, via: "dry-run" });
+    return sendDryRunResponse(res, modelId, stream);
+  }
 
   // Cloud-attempt evidence (status + classifier code) set when the cloud
   // rejected this request before fallback ran; consumed by record() so the
@@ -426,6 +485,10 @@ server.listen(config.PORT, config.HOST, () => {
         : `${config.BUDGET_REQUESTS_PER_HOUR} req/h per account (warn at 80%)`}`,
       `Max Msgs : ${Number.isFinite(config.MAX_MESSAGES) ? `${config.MAX_MESSAGES} entries` : "unlimited"}`,
       `Models   : ${MODELS.map(m => m.id).join(", ")}`,
+      `Banner   : ${config.BANNER_MODE} (${config.BANNER_MODE === "separate" ? "own system message" : "folded into the first system message"})`,
+      ...(config.DRY_RUN
+        ? [`Dry Run  : ON — requests are captured to ${config.DRY_RUN_FILE}, never sent`]
+        : []),
       "",
       "OpenCode / OpenAI SDK Base URL:",
       `http://${config.HOST}:${config.PORT}/v1`,

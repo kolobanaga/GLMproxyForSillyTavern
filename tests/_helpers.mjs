@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -40,6 +41,13 @@ export function startProxy(port, env = {}) {
         // machine cannot defeat a case that isolates via a fake HOME below.
         // A case that means to exercise relocation sets these explicitly.
         OPENCLAW_STATE_DIR: "", PROXY_STATE_DIR: "",
+        // Same reason, one level up: the installed app's version is read from
+        // LOCALAPPDATA/ProgramFiles, which a fake HOME cannot redirect — so a
+        // real install on the developer's machine would leak into every case
+        // that expects the pinned identity. Pointed at a path that cannot
+        // exist, the discovery is exercised but finds nothing. A case that
+        // means to exercise the installed-app rung sets it explicitly.
+        GLMP_APP_PACKAGE: path.join(os.tmpdir(), "glmp-no-such-app", "package.json"),
         ...env,
       },
       stdio: ["ignore", "pipe", "pipe"],
