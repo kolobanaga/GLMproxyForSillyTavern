@@ -1,6 +1,7 @@
 {
   "models": [
     { "id": "zai_auto",                       "name": "Auto",              "contextWindow": 1048576, "maxTokens": 131072 },
+    { "id": "zai_glm-x-preview",              "name": "GLM-5.4",           "contextWindow": 1048576, "maxTokens": 131072 },
     { "id": "zaicoding_glm-5.3",              "name": "GLM-5.3",           "contextWindow": 1048576, "maxTokens": 131072 },
     { "id": "zai_glm-5-turbo",                "name": "GLM-5-Turbo",       "contextWindow": 204800,   "maxTokens": 131072 },
     { "id": "zai_glm-5.3-flash",              "name": "GLM-5.3-Flash",     "contextWindow": 1048576, "maxTokens": 131072 },

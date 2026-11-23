@@ -164,6 +164,7 @@ Everything has a default; set only what you need.
 | `GLMP_DRY_RUN_FILE` | `./proxy_dryrun.json` | where the dry run writes the captured requests (a pretty-printed JSON array) |
 | `GLMP_DRY_RUN_MAX_ENTRIES` | `100` | how many captured requests the dump file keeps (the oldest are dropped) |
 | `GLMP_DRY_RUN_VERBOSE` | off | `1` = also print the captured upstream body to the log |
+| `GLMP_LOG_MESSAGES` | on | `0` = the request log (`proxy_requests.json`) keeps the shape of every entry (model, status, timing, counts) but does **not** write `last_message` — the text of your own last message never reaches the disk. The `.bat` launchers in this fork set it to `0` by default; set it to `1` to get the message back |
 
 Upstream's own knobs (`PROXY_KEY`, `PORT`, `LOG_LEVEL`, `JSONL_LOG`,
 `BUDGET_REQUESTS_PER_HOUR`, …) keep working — see

@@ -21,6 +21,11 @@ if errorlevel 1 (
 
 set "GLMP_BANNER_MODE=merge"
 
+rem The request log (proxy_requests.json) keeps the shape of every request
+rem (model, status, timing) but NOT the text of your last message. Set
+rem GLMP_LOG_MESSAGES=1 to write last_message back into the log.
+set "GLMP_LOG_MESSAGES=0"
+
 echo.
 echo   GLM Proxy - banner MERGED
 echo   ----------------------------------------------

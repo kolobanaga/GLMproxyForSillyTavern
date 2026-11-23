@@ -41,7 +41,7 @@ const { log } = createLogger(config.LOG_LEVEL);
 const { MODELS } = loadModelCatalog(config);
 const { getToken, invalidateToken, startWatch } = createTokenLayer(config, log);
 const { rateLimit, startBucketSweep } = createRateLimiter(config.RATE_LIMIT);
-const { logRequest } = createRequestLogger(config.REQUEST_LOG_FILE);
+const { logRequest } = createRequestLogger(config.REQUEST_LOG_FILE, { logMessages: config.LOG_MESSAGES });
 const { logJsonl } = createJsonlLogger({ enabled: config.JSONL_LOG, sync: config.JSONL_SYNC, file: config.JSONL_FILE, maxBytes: config.JSONL_MAX_BYTES });
 
 // Remembers models that failed PERMANENTLY (quota exhausted, unknown id) so
@@ -417,6 +417,7 @@ server.listen(config.PORT, config.HOST, () => {
         : `${config.BUDGET_REQUESTS_PER_HOUR} req/h per account (warn at 80%)`}`,
       `Max Msgs : ${Number.isFinite(config.MAX_MESSAGES) ? `${config.MAX_MESSAGES} entries` : "unlimited"}`,
       `Models   : ${MODELS.map(m => m.id).join(", ")}`,
+      `Log Msgs : ${config.LOG_MESSAGES ? "on (last_message written to the request log)" : "off (last_message not written)"}`,
       "",
       "Claude Code CLI Base URL:",
       `http://${config.HOST}:${config.PORT}`,

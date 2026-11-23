@@ -21,6 +21,13 @@ if errorlevel 1 (
 
 set "GLMP_DRY_RUN=1"
 
+rem The request log (proxy_requests.json) keeps the shape of every request
+rem (model, status, timing) but NOT the text of your last message. Set
+rem GLMP_LOG_MESSAGES=1 to write last_message back into the log.
+rem The dry-run dump (proxy_dryrun.json) is a different thing: it is the
+rem whole captured request, text included - that is the point of the mode.
+set "GLMP_LOG_MESSAGES=0"
+
 echo.
 echo   GLM Proxy - DRY RUN
 echo   ----------------------------------------------

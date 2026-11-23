@@ -1,5 +1,32 @@
 # Changelog
 
+## 3.4.1 — GLM-5.4, and a request log that keeps your text off the disk
+
+Two additions, both about what the proxy knows and what it writes down.
+
+### Added
+
+- **GLM-5.4 is a first-class model.** The vendor's id for it is
+  `zai_glm-x-preview`; the proxy now treats it like the other GLM models: it is
+  capped at the same verified 131072 output tokens (the vendor's catalog entry
+  advertises 307200, which the proxy does not repeat), it is in the built-in
+  fallback list so it survives a catalog outage, and the credit-tier heuristic
+  knows it is a High-tier model — so the `claude-opus-*` / `claude-sonnet-*`
+  aliases can route to it.
+- **`GLMP_LOG_MESSAGES` keeps the conversation out of the log.** `0` = the
+  request log (`proxy_requests.json`) keeps the shape of every entry (model,
+  status, timing, message count) but does **not** write `last_message` — the
+  text of your own last message. The `.bat` launchers in this fork set it to
+  `0` by default; set it to `1` to get the message back. The startup banner
+  says which way it is set, so a quiet log is never a mystery.
+
+### Notes
+
+- GLM-5.4 is text-only: the vendor's catalog lists no image input for it.
+- The dry-run dump (`proxy_dryrun.json`) still holds the whole captured
+  request, text included — that is what the mode is for. The flag governs the
+  request ring log only.
+
 ## 3.4.0 — the SillyTavern profile
 
 The first release of this fork. Upstream's GLM Proxy keeps working exactly as

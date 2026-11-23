@@ -11,3 +11,4 @@ proxy_dryrun.json
 proxy_dryrun.jsonl
 proxy_dryrun*.tmp
 stuff/
+.vscode

@@ -22,6 +22,7 @@ import {
   OUTPUT_CAPS,
   validateChatPayload,
   normalizeClientMessages,
+  createRequestLogger,
 } from "../lib/core.js";
 
 let passed = 0;
@@ -312,9 +313,10 @@ check("resolveUpstreamModelId keeps known ids, maps auto, prefixes others", () =
 
 check("fallback catalog ships expected models incl glm-5.3-flash", () => {
   const cfg = loadConfig({ format: "openai" });
-  const expectedCount = process.platform === "linux" ? 4 : 6;
+  const expectedCount = process.platform === "linux" ? 4 : 7;
   assert.ok(Array.isArray(cfg.FALLBACK_MODELS) && cfg.FALLBACK_MODELS.length === expectedCount);
   assert.ok(cfg.FALLBACK_MODELS.some((m) => m.id === "zai_glm-5.3-flash"));
+  assert.ok(cfg.FALLBACK_MODELS.some((m) => m.id === "zai_glm-x-preview"), "GLM-5.4 must survive a catalog outage");
 });
 
 // The harness declaration the upstream's prompt allowlist accepts, and the switch
@@ -468,7 +470,7 @@ check("账号已被封禁 translates to English", () => {
 // ── Max-output clamp (upstream silently swaps to deepseek when exceeded) ─────
 
 check("every GLM model clamps to the real 131072 cap", () => {
-  for (const id of ["zaicoding_glm-5.3", "zai_glm-5.3-flash", "zai_glm-5-turbo", "zai_auto"]) {
+  for (const id of ["zaicoding_glm-5.3", "zai_glm-x-preview", "zai_glm-5.3-flash", "zai_glm-5-turbo", "zai_auto"]) {
     assert.equal(clampMaxOutput(id, 393_216), 131_072, `${id} should clamp 393216 → 131072`);
     assert.equal(clampMaxOutput(id, 131_072), 131_072, `${id} at-cap passes through`);
     assert.equal(clampMaxOutput(id, 131_073), 131_072, `${id} one-over clamps`);
@@ -549,6 +551,48 @@ check("normalizeClientMessages flattens all-text arrays but preserves images", (
   assert.equal(out[1].content[1].type, "image_url");
   assert.equal(out[1].content[1].image_url.url, "data:image/png;base64,AAAA");
   assert.equal(out[2].role, "system");
+});
+
+// ── Request log: the last message is the user's own text ────────────────────
+
+check("the request log keeps last_message by default", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "glm-log-"));
+  const file = path.join(dir, "requests.json");
+  try {
+    const { logRequest } = createRequestLogger(file);
+    logRequest({ timestamp: "t", model: "zai_auto", status: 200, last_message: "hello there" });
+    const rows = JSON.parse(fs.readFileSync(file, "utf-8"));
+    assert.equal(rows[0].last_message, "hello there");
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+check("GLMP_LOG_MESSAGES=0 keeps the entry but drops last_message", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "glm-log-"));
+  const file = path.join(dir, "requests.json");
+  try {
+    const { logRequest } = createRequestLogger(file, { logMessages: false });
+    logRequest({ timestamp: "t", model: "zai_auto", status: 200, via: "cloud", last_message: "hello there", message_count: 1 });
+    const rows = JSON.parse(fs.readFileSync(file, "utf-8"));
+    assert.equal(rows.length, 1);
+    assert.equal("last_message" in rows[0], false, "last_message must not reach the disk");
+    assert.equal(rows[0].model, "zai_auto");
+    assert.equal(rows[0].message_count, 1, "the rest of the entry must survive");
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+check("GLMP_LOG_MESSAGES=0 is the default-off switch in the config", () => {
+  const before = process.env.GLMP_LOG_MESSAGES;
+  try {
+    delete process.env.GLMP_LOG_MESSAGES;
+    assert.equal(loadConfig({ format: "openai" }).LOG_MESSAGES, true);
+    process.env.GLMP_LOG_MESSAGES = "0";
+    assert.equal(loadConfig({ format: "openai" }).LOG_MESSAGES, false);
+    process.env.GLMP_LOG_MESSAGES = "1";
+    assert.equal(loadConfig({ format: "openai" }).LOG_MESSAGES, true);
+  } finally {
+    if (before === undefined) delete process.env.GLMP_LOG_MESSAGES;
+    else process.env.GLMP_LOG_MESSAGES = before;
+  }
 });
 
 console.log(`\n  ${passed}/${passed + failed} passed`);
