@@ -22,7 +22,13 @@ Two additions, both about what the proxy knows and what it writes down.
 
 ### Notes
 
-- GLM-5.4 is text-only: the vendor's catalog lists no image input for it.
+- GLM-5.4 is multimodal: it takes image, video and file input (native vision,
+  announced with the 23 Nov launch). AutoClaw's model catalog nevertheless still
+  lists `zai_glm-x-preview` as `input: ["text"]`, so the desktop app reads image
+  attachments through its separate AutoGLM Image Recognition service and hands
+  the model a text description instead of the picture. The proxy passes image
+  parts through untouched, so a client that attaches an image gets the model
+  looking at it directly.
 - The dry-run dump (`proxy_dryrun.json`) still holds the whole captured
   request, text included — that is what the mode is for. The flag governs the
   request ring log only.
