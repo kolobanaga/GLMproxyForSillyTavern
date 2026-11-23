@@ -313,10 +313,39 @@ check("resolveUpstreamModelId keeps known ids, maps auto, prefixes others", () =
 
 check("fallback catalog ships expected models incl glm-5.3-flash", () => {
   const cfg = loadConfig({ format: "openai" });
-  const expectedCount = process.platform === "linux" ? 4 : 7;
+  // Two catalogs, two platforms. The Linux 2.x app natively provisions its own
+  // four models (no DeepSeek, no GLM-5-Turbo, no GLM-5.4 - see
+  // README.upstream.md), so its fallback list stays that four-model baseline;
+  // every other platform shares the seven-model list.
+  const isLinux = process.platform === "linux";
+  const expectedCount = isLinux ? 4 : 7;
   assert.ok(Array.isArray(cfg.FALLBACK_MODELS) && cfg.FALLBACK_MODELS.length === expectedCount);
   assert.ok(cfg.FALLBACK_MODELS.some((m) => m.id === "zai_glm-5.3-flash"));
-  assert.ok(cfg.FALLBACK_MODELS.some((m) => m.id === "zai_glm-x-preview"), "GLM-5.4 must survive a catalog outage");
+  if (!isLinux) {
+    assert.ok(cfg.FALLBACK_MODELS.some((m) => m.id === "zai_glm-x-preview"), "GLM-5.4 must survive a catalog outage");
+  }
+});
+
+check("the built-in last resort list matches the editable catalog", () => {
+  const isLinux = process.platform === "linux";
+  const editable = JSON.parse(fs.readFileSync(new URL("../lib/fallback-models.json", import.meta.url), "utf-8"));
+  const expected = isLinux ? editable.linuxModels : editable.models;
+  const before = process.env.FALLBACK_MODELS_PATH;
+  try {
+    // An unreadable override degrades to the built-in list in lib/core.js -
+    // that list has to carry the same models as the editable catalog, or the
+    // catalog outage loses a model the proxy promises to serve.
+    process.env.FALLBACK_MODELS_PATH = "C:/definitely/not/here.json";
+    const cfg = loadConfig({ format: "openai" });
+    assert.deepEqual(
+      cfg.FALLBACK_MODELS.map((m) => m.id).sort(),
+      expected.map((m) => m.id).sort(),
+      "the built-in list in lib/core.js and lib/fallback-models.json must stay in sync"
+    );
+  } finally {
+    if (before === undefined) delete process.env.FALLBACK_MODELS_PATH;
+    else process.env.FALLBACK_MODELS_PATH = before;
+  }
 });
 
 // The harness declaration the upstream's prompt allowlist accepts, and the switch
